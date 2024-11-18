@@ -1,0 +1,64 @@
+.reactMarkdown {
+  line-height: 1.7;
+}
+
+.reactMarkdown ul {
+  list-style-position: inside;
+  margin: 10px 0;
+  padding-left: 20px;
+  list-style: circle;
+}
+
+.reactMarkdown ol {
+  padding-left: 20px;
+  list-style-position: outside;
+  list-style-type: none;
+  list-style: disc;
+}
+
+.reactMarkdown table {
+  margin: 15px 0;
+  width: 100%;
+  border: 1px solid #bce4b6;
+  border-radius: 10px;
+  border-collapse: separate;
+  padding: 10px;
+}
+
+.reactMarkdown table td,
+.reactMarkdown table th {
+  text-align: start;
+}
+
+.reactMarkdown p,
+.reactMarkdown span {
+  /* opacity: 0.6; */
+  /* color: rgba(0, 0, 0, 0.6); */
+}
+
+.reactMarkdown h1,
+.reactMarkdown h2,
+.reactMarkdown h3,
+.reactMarkdown h4,
+.reactMarkdown p strong {
+  opacity: 1;
+  position: relative;
+  font-weight: bold;
+  color: inherit;
+}
+
+.reactMarkdown h1 {
+  font-size: 1.5em;
+}
+
+.reactMarkdown h2 {
+  font-size: 1.1em;
+}
+
+.reactMarkdown h3 {
+  font-size: 1em;
+}
+
+.reactMarkdown h4 {
+  font-size: 1em;
+}

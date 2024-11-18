@@ -1,0 +1,63 @@
+/* chat-interface.module.css */
+.chatInterfaceContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  background-color: #f4f4f4;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+.chatInputContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.fileInput {
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+.messageInput {
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  width: 100%;
+}
+
+.sendButton {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.sendButton:hover {
+  background-color: #0056b3;
+}
+
+.responseContainer {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #e1e1e1;
+  border-radius: 5px;
+  width: 100%;
+}
+
+.responseContainer h3 {
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+.responseContainer p {
+  font-size: 16px;
+}
