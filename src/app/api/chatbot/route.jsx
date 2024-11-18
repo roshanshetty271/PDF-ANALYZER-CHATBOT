@@ -47,45 +47,47 @@ export async function POST(req) {
         files: {},
       };
 
+      // Pipe request into Busboy
+      req.pipe(busboy);
+
       // Parse the incoming request
-      await new Promise((resolve, reject) => {
-        busboy.on('field', (fieldname, val) => {
-          parsed.fields[fieldname] = val;
-        });
-
-        busboy.on('file', (fieldname, file, filename, encoding, mimeType) => {
-          const fileBufferChunks = [];
-          file.on('data', (chunk) => {
-            fileBufferChunks.push(chunk);
-          });
-
-          file.on('end', () => {
-            parsed.files[fieldname] = Buffer.concat(fileBufferChunks);
-            fileStream.end(); // End file stream
-          });
-        });
-
-        busboy.on('finish', () => {
-          resolve();
-        });
-
-        busboy.on('error', (err) => {
-          reject(err);
-        });
-
-        req.pipe(busboy);
+      busboy.on('field', (fieldname, val) => {
+        parsed.fields[fieldname] = val;
       });
 
-      userMessage = parsed.fields.userMessage;
+      busboy.on('file', (fieldname, file, filename, encoding, mimeType) => {
+        const fileBufferChunks = [];
+        file.on('data', (chunk) => {
+          fileBufferChunks.push(chunk);
+        });
 
-      if (!parsed.files.file || !userMessage) {
+        file.on('end', () => {
+          parsed.files[fieldname] = Buffer.concat(fileBufferChunks);
+          fileStream.end(); // End file stream
+        });
+      });
+
+      busboy.on('finish', () => {
+        // Files and fields have been parsed
+        userMessage = parsed.fields.userMessage;
+
+        if (!parsed.files.file || !userMessage) {
+          return NextResponse.json(
+            { error: 'Missing file or user message in the request body.' },
+            { status: 400 }
+          );
+        }
+
+        fileBuffer = parsed.files.file;
+      });
+
+      busboy.on('error', (err) => {
+        console.error('Error in Busboy:', err);
         return NextResponse.json(
-          { error: 'Missing file or user message in the request body.' },
-          { status: 400 }
+          { error: 'Error in processing file upload.' },
+          { status: 500 }
         );
-      }
-
-      fileBuffer = parsed.files.file;
+      });
     }
 
     // Extract content from the uploaded PDF
@@ -115,6 +117,7 @@ export async function POST(req) {
       pdfContent: pdfText,
       message: response.choices[0]?.message?.content || 'No response from AI.',
     });
+
   } catch (error) {
     console.error('Error processing the request:', error);
     return NextResponse.json(
