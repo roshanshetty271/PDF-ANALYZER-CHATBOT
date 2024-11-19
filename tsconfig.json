@@ -28,7 +28,7 @@
     ".next/types/**/*.ts",
     "**/*.ts",
     "**/*.tsx"
-, "src/app/api/chatbot/route.jsx"  ],
+, "src/app/api/chatbot/route.js"  ],
   "exclude": [
     "node_modules"
   ]
