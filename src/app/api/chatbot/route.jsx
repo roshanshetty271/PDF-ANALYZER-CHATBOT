@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
-import { OpenAI } from 'openai'; // Ensure this is the correct OpenAI import
+import { OpenAI } from 'openai';
 import { IncomingMessage } from 'http';
 import { PassThrough } from 'stream';
 import Busboy from 'busboy';
@@ -8,9 +8,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Ensure dynamic import and correct client initialization
 const openai = new OpenAI({
-  apiKey: process.env.VITE_OPENAI_API_KEY,
+  apiKey: process.env.VITE_OPENAI_API_KEY, // Ensure this is set correctly in your environment variables
 });
 
 export const config = {
@@ -22,7 +21,6 @@ export const config = {
 export async function POST(req) {
   try {
     const isLocal = process.env.NODE_ENV === 'development';
-
     let fileBuffer, userMessage;
 
     if (isLocal) {
@@ -48,47 +46,45 @@ export async function POST(req) {
         files: {},
       };
 
-      // Pipe request into Busboy
-      req.pipe(busboy);
-
       // Parse the incoming request
-      busboy.on('field', (fieldname, val) => {
-        parsed.fields[fieldname] = val;
-      });
-
-      busboy.on('file', (fieldname, file, filename, encoding, mimeType) => {
-        const fileBufferChunks = [];
-        file.on('data', (chunk) => {
-          fileBufferChunks.push(chunk);
+      await new Promise((resolve, reject) => {
+        busboy.on('field', (fieldname, val) => {
+          parsed.fields[fieldname] = val;
         });
 
-        file.on('end', () => {
-          parsed.files[fieldname] = Buffer.concat(fileBufferChunks);
-          fileStream.end(); // End file stream
+        busboy.on('file', (fieldname, file, filename, encoding, mimeType) => {
+          const fileBufferChunks = [];
+          file.on('data', (chunk) => {
+            fileBufferChunks.push(chunk);
+          });
+
+          file.on('end', () => {
+            parsed.files[fieldname] = Buffer.concat(fileBufferChunks);
+            fileStream.end(); // End file stream
+          });
         });
+
+        busboy.on('finish', () => {
+          resolve();
+        });
+
+        busboy.on('error', (err) => {
+          reject(err);
+        });
+
+        req.pipe(busboy);
       });
 
-      busboy.on('finish', () => {
-        // Files and fields have been parsed
-        userMessage = parsed.fields.userMessage;
+      userMessage = parsed.fields.userMessage;
 
-        if (!parsed.files.file || !userMessage) {
-          return NextResponse.json(
-            { error: 'Missing file or user message in the request body.' },
-            { status: 400 }
-          );
-        }
-
-        fileBuffer = parsed.files.file;
-      });
-
-      busboy.on('error', (err) => {
-        console.error('Error in Busboy:', err);
+      if (!parsed.files.file || !userMessage) {
         return NextResponse.json(
-          { error: 'Error in processing file upload.' },
-          { status: 500 }
+          { error: 'Missing file or user message in the request body.' },
+          { status: 400 }
         );
-      });
+      }
+
+      fileBuffer = parsed.files.file;
     }
 
     // Extract content from the uploaded PDF
@@ -118,7 +114,6 @@ export async function POST(req) {
       pdfContent: pdfText,
       message: response.choices[0]?.message?.content || 'No response from AI.',
     });
-
   } catch (error) {
     console.error('Error processing the request:', error);
     return NextResponse.json(
