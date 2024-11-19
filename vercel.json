@@ -1,6 +1,6 @@
 {
     "functions": {
-      "api/chatbot/route.jsx": {
+      "api/chatbot/route.js": {
         "includeFiles": "uploads/**"
       }
     }
