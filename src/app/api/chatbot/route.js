@@ -103,9 +103,29 @@ export async function POST(req) {
     });
   } catch (error) {
     console.error('Error processing the request:', error);
-    return NextResponse.json(
-      { error: 'Invalid data or error in the server processing.' },
-      { status: 500 }
-    );
+
+    // Check for specific error types
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      console.error('Response error:', error.response.status, error.response.data);
+      return NextResponse.json(
+        { error: `OpenAI API error: ${error.response.status}` },
+        { status: error.response.status }
+      );
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('No response received:', error.request);
+      return NextResponse.json(
+        { error: 'No response from OpenAI API.' },
+        { status: 504 }
+      );
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error('Error setting up request:', error.message);
+      return NextResponse.json(
+        { error: 'Error in server processing.' },
+        { status: 500 }
+      );
+    }
   }
 }
