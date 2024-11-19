@@ -27,8 +27,7 @@ const ChatInterface = () => {
       return;
     }
     setLoading(true);
-    
-  
+    setResponse(""); // Clear previous responses
 
     // Create form data to send both file and message
     const formData = new FormData();
@@ -41,19 +40,25 @@ const ChatInterface = () => {
         body: formData,
       });
 
-      // Check if the response is successful
       if (!res.ok) {
         alert("Error while communicating with the server");
         return;
       }
 
-      const data = await res.json();
+      // Read the streaming response
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let result = "";
 
-      // Update the response handling
-      if (data.message) {
-        setResponse(data.message); // AI's response message
-      } else {
-        setResponse("No response from AI");
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          result += chunk;
+          setResponse((prev) => prev + chunk); // Update response incrementally
+        }
       }
     } catch (error) {
       console.error("Error:", error);

@@ -1,19 +1,18 @@
 import { NextResponse } from 'next/server';
 import { OpenAI } from 'openai';
-import fs from 'fs';
-import path from 'path';
-import dotenv from 'dotenv';
 import pdf from 'pdf-extraction';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
 const openai = new OpenAI({
   apiKey: process.env.VITE_OPENAI_API_KEY,
+  timeout: 120000, // Set a higher timeout
 });
 
 export const config = {
   api: {
-    bodyParser: false, // Disable Next.js body parsing to handle file uploads manually
+    bodyParser: false, // Disable body parser for file uploads
   },
 };
 
@@ -21,49 +20,19 @@ export async function POST(req) {
   try {
     console.log('Request received:', { method: req.method, url: req.url });
 
-    const isLocal = process.env.NODE_ENV === 'development';
-    console.log('Is Local Environment:', isLocal);
+    const formData = await req.formData();
+    const file = formData.get('file');
+    const userMessage = formData.get('userMessage');
 
-    let fileBuffer, userMessage;
+    if (!file || !userMessage) {
+      console.error('Missing file or user message in the request body.');
+      return NextResponse.json(
+        { error: 'Missing file or user message in the request body.' },
+        { status: 400 }
+      );
+    }
 
-    // if (isLocal) {
-      // Handle FormData in local environment
-      console.log('Parsing FormData locally...');
-      const formData = await req.formData();
-      const file = formData.get('file');
-      userMessage = formData.get('userMessage');
-
-      if (!file || !userMessage) {
-        console.error('Missing file or user message in the request body.');
-        return NextResponse.json(
-          { error: 'Missing file or user message in the request body.' },
-          { status: 400 }
-        );
-      }
-
-      fileBuffer = Buffer.from(await file.arrayBuffer());
-      console.log('File Buffer (Local):', fileBuffer);
-    // } else {
-    //   // Production environment: handle file and userMessage from the request body
-    //   console.log('Parsing form data in production environment...');
-    //   const form = new URLSearchParams(await req.text());
-    //   console.log('Form Data:', form);
-
-    //   userMessage = form.get('userMessage');
-    //   const filePath = path.join(process.cwd(), 'uploads', 'uploadedFile.pdf');
-    //   console.log('File Path:', filePath);
-
-    //   if (fs.existsSync(filePath)) {
-    //     fileBuffer = fs.readFileSync(filePath);
-    //     console.log('File Buffer (Production):', fileBuffer);
-    //   } else {
-    //     console.error('File not found in the uploads directory on the server.');
-    //     return NextResponse.json(
-    //       { error: 'File not found on the server.' },
-    //       { status: 404 }
-    //     );
-    //   }
-    // }
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
 
     if (!fileBuffer) {
       console.error('File buffer is null or empty.');
@@ -79,15 +48,13 @@ export async function POST(req) {
     const pdfText = pdfData.text;
     console.log('Extracted PDF Text:', pdfText);
 
-    // Send request to OpenAI API
+    // Stream response from OpenAI API
     console.log('Sending extracted text to OpenAI API...');
-    const response = await openai.chat.completions.create({
+    const responseStream = await openai.chat.completions.create({
       model: 'gpt-4',
+      stream: true, // Enable streaming
       messages: [
-        {
-          role: 'system',
-          content: 'You are a helpful assistant...',
-        },
+        { role: 'system', content: 'You are a helpful assistant...' },
         { role: 'user', content: userMessage },
         {
           role: 'system',
@@ -95,11 +62,37 @@ export async function POST(req) {
         },
       ],
     });
-    console.log('OpenAI Response:', response);
 
-    return NextResponse.json({
-      pdfContent: pdfText,
-      message: response.choices[0]?.message?.content || 'No response from AI.',
+    const reader = responseStream.body.getReader();
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              console.log('Stream finished.');
+              controller.close();
+              break;
+            }
+            const chunk = decoder.decode(value, { stream: true });
+            console.log('Chunk received:', chunk); // Debugging log
+            controller.enqueue(encoder.encode(chunk));
+          }
+        } catch (err) {
+          console.error('Error in streaming response:', err);
+          controller.error(err); // Notify client of error
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
     });
   } catch (error) {
     console.error('Error processing the request:', error);
