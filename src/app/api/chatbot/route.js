@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { OpenAI } from 'openai';
-import { IncomingMessage } from 'http';
-import { PassThrough } from 'stream';
+import fs from 'fs';
+import path from 'path';
 import dotenv from 'dotenv';
 import pdf from 'pdf-extraction';
 
@@ -19,60 +19,68 @@ export const config = {
 
 export async function POST(req) {
   try {
-    console.log("Request received", req);
+    console.log('Request received:', { method: req.method, url: req.url });
+
     const isLocal = process.env.NODE_ENV === 'development';
-    console.log("Is Local:", isLocal);
+    console.log('Is Local Environment:', isLocal);
+
     let fileBuffer, userMessage;
-    console.log("File Buffer:", fileBuffer);
-    console.log("User Message:", userMessage);
+
     if (isLocal) {
-      // Handle FormData locally
+      // Handle FormData in local environment
+      console.log('Parsing FormData locally...');
       const formData = await req.formData();
-      console.log("Form Data:", formData);
       const file = formData.get('file');
-      console.log("File:", file);
       userMessage = formData.get('userMessage');
-      console.log("User Message:", userMessage);
 
       if (!file || !userMessage) {
-        console.log("Missing file or user message in the request body.");
+        console.error('Missing file or user message in the request body.');
         return NextResponse.json(
           { error: 'Missing file or user message in the request body.' },
           { status: 400 }
         );
       }
-      console.log("File Buffer (local):", fileBuffer);
-      fileBuffer = Buffer.from(await file.arrayBuffer());
 
-      console.log("File Buffer (local):", fileBuffer);  // Debug log for file buffer
+      fileBuffer = Buffer.from(await file.arrayBuffer());
+      console.log('File Buffer (Local):', fileBuffer);
     } else {
-      // Parse file with built-in handling (ensure file data is available in the request)
+      // Production environment: handle file and userMessage from the request body
+      console.log('Parsing form data in production environment...');
       const form = new URLSearchParams(await req.text());
-      console.log("Form:", form);
+      console.log('Form Data:', form);
+
       userMessage = form.get('userMessage');
-      console.log("User Message:", userMessage);
-      fileBuffer = Buffer.from(form.get('file'), 'base64');
-      console.log("File Buffer (production):", fileBuffer);
-      console.log("File Buffer (production):", fileBuffer);  // Debug log for file buffer
+      const filePath = path.join(process.cwd(), 'uploads', 'uploadedFile.pdf');
+      console.log('File Path:', filePath);
+
+      if (fs.existsSync(filePath)) {
+        fileBuffer = fs.readFileSync(filePath);
+        console.log('File Buffer (Production):', fileBuffer);
+      } else {
+        console.error('File not found in the uploads directory on the server.');
+        return NextResponse.json(
+          { error: 'File not found on the server.' },
+          { status: 404 }
+        );
+      }
     }
 
     if (!fileBuffer) {
+      console.error('File buffer is null or empty.');
       return NextResponse.json(
         { error: 'File buffer is null or empty.' },
         { status: 400 }
       );
     }
 
-    // Extract content from the uploaded PDF
+    // Extract text from the uploaded PDF
+    console.log('Extracting text from PDF...');
     const pdfData = await pdf(fileBuffer);
-    console.log("PDF Data:", pdfData);
     const pdfText = pdfData.text;
-
-    console.log("PDF Text:", pdfText);
-
-    console.log('Extracted PDF text:', pdfText);
+    console.log('Extracted PDF Text:', pdfText);
 
     // Send request to OpenAI API
+    console.log('Sending extracted text to OpenAI API...');
     const response = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [
@@ -87,7 +95,7 @@ export async function POST(req) {
         },
       ],
     });
-    console.log("Response:", response);
+    console.log('OpenAI Response:', response);
 
     return NextResponse.json({
       pdfContent: pdfText,
