@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
-import { OpenAI } from 'openai';
+import { OpenAI } from 'openai'; // Ensure this is the correct OpenAI import
 import { IncomingMessage } from 'http';
 import { PassThrough } from 'stream';
 import Busboy from 'busboy';
@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Ensure dynamic import and correct client initialization
 const openai = new OpenAI({
   apiKey: process.env.VITE_OPENAI_API_KEY,
 });
