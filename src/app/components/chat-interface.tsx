@@ -27,33 +27,37 @@ const ChatInterface = () => {
       return;
     }
     setLoading(true);
-    setResponse('');
+    
+  
+
+    // Create form data to send both file and message
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("userMessage", userMessage);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('userMessage', userMessage);
-
-      const response = await fetch('/api/chatbot', {
-        method: 'POST',
+      const res = await fetch("/api/chatbot", {
+        method: "POST",
         body: formData,
       });
 
-      if (!response.body) throw new Error('No response body');
+      // Check if the response is successful
+      if (!res.ok) {
+        alert("Error while communicating with the server");
+        return;
+      }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let result = '';
+      const data = await res.json();
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        result += decoder.decode(value, { stream: true });
-        setResponse((prev) => prev + result); // Update UI with partial results
+      // Update the response handling
+      if (data.message) {
+        setResponse(data.message); // AI's response message
+      } else {
+        setResponse("No response from AI");
       }
     } catch (error) {
-      console.error('Error:', error);
-      alert('Failed to process the request.');
+      console.error("Error:", error);
+      alert("Something went wrong while sending the request.");
     } finally {
       setLoading(false);
     }

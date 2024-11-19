@@ -4,7 +4,6 @@ import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import pdf from 'pdf-extraction';
-import formidable from 'formidable';
 
 dotenv.config();
 
@@ -19,20 +18,94 @@ export const config = {
 };
 
 export async function POST(req) {
-  const form = new formidable.IncomingForm();
+  try {
+    console.log('Request received:', { method: req.method, url: req.url });
 
-  form.parse(req, async (err, fields, files) => {
-    if (err) {
-      console.error('Error parsing form:', err);
-      return NextResponse.json({ error: 'Error in server processing.' }, { status: 500 });
+    const isLocal = process.env.NODE_ENV === 'development';
+    console.log('Is Local Environment:', isLocal);
+
+    let fileBuffer, userMessage;
+
+    // if (isLocal) {
+      // Handle FormData in local environment
+      console.log('Parsing FormData locally...');
+      const formData = await req.formData();
+      const file = formData.get('file');
+      userMessage = formData.get('userMessage');
+
+      if (!file || !userMessage) {
+        console.error('Missing file or user message in the request body.');
+        return NextResponse.json(
+          { error: 'Missing file or user message in the request body.' },
+          { status: 400 }
+        );
+      }
+
+      fileBuffer = Buffer.from(await file.arrayBuffer());
+      console.log('File Buffer (Local):', fileBuffer);
+    // } else {
+    //   // Production environment: handle file and userMessage from the request body
+    //   console.log('Parsing form data in production environment...');
+    //   const form = new URLSearchParams(await req.text());
+    //   console.log('Form Data:', form);
+
+    //   userMessage = form.get('userMessage');
+    //   const filePath = path.join(process.cwd(), 'uploads', 'uploadedFile.pdf');
+    //   console.log('File Path:', filePath);
+
+    //   if (fs.existsSync(filePath)) {
+    //     fileBuffer = fs.readFileSync(filePath);
+    //     console.log('File Buffer (Production):', fileBuffer);
+    //   } else {
+    //     console.error('File not found in the uploads directory on the server.');
+    //     return NextResponse.json(
+    //       { error: 'File not found on the server.' },
+    //       { status: 404 }
+    //     );
+    //   }
+    // }
+
+    if (!fileBuffer) {
+      console.error('File buffer is null or empty.');
+      return NextResponse.json(
+        { error: 'File buffer is null or empty.' },
+        { status: 400 }
+      );
     }
 
-    const userMessage = fields.userMessage;
-    const file = files.file;
+    // Extract text from the uploaded PDF
+    console.log('Extracting text from PDF...');
+    const pdfData = await pdf(fileBuffer);
+    const pdfText = pdfData.text;
+    console.log('Extracted PDF Text:', pdfText);
 
-    // Process the file and userMessage as needed
-    // ...
+    // Send request to OpenAI API
+    console.log('Sending extracted text to OpenAI API...');
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful assistant...',
+        },
+        { role: 'user', content: userMessage },
+        {
+          role: 'system',
+          content: `Here is the content extracted from the uploaded PDF: ${pdfText}`,
+        },
+      ],
+    });
+    console.log('OpenAI Response:', response);
 
-    return NextResponse.json({ message: 'Success' });
-  });
+    return NextResponse.json({
+      pdfContent: pdfText,
+      message: response.choices[0]?.message?.content || 'No response from AI.',
+    });
+  } catch (error) {
+    console.error('Error processing the request:', error);
+    return NextResponse.json(
+      { error: 'Invalid data or error in the server processing.' },
+      { status: 500 }
+    );
+  }
 }

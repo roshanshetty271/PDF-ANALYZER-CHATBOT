@@ -1,8 +1,0 @@
-{
-    "functions": {
-      "src/app/api/chatbot/route.js": {
-        "includeFiles": "uploads/**"
-      }
-    }
-  }
-  
