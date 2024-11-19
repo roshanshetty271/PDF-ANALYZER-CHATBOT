@@ -19,32 +19,40 @@ export const config = {
 
 export async function POST(req) {
   try {
+    console.log("Request received", req);
     const isLocal = process.env.NODE_ENV === 'development';
-
+    console.log("Is Local:", isLocal);
     let fileBuffer, userMessage;
-
+    console.log("File Buffer:", fileBuffer);
+    console.log("User Message:", userMessage);
     if (isLocal) {
       // Handle FormData locally
       const formData = await req.formData();
+      console.log("Form Data:", formData);
       const file = formData.get('file');
+      console.log("File:", file);
       userMessage = formData.get('userMessage');
+      console.log("User Message:", userMessage);
 
       if (!file || !userMessage) {
+        console.log("Missing file or user message in the request body.");
         return NextResponse.json(
           { error: 'Missing file or user message in the request body.' },
           { status: 400 }
         );
       }
-
+      console.log("File Buffer (local):", fileBuffer);
       fileBuffer = Buffer.from(await file.arrayBuffer());
 
       console.log("File Buffer (local):", fileBuffer);  // Debug log for file buffer
     } else {
       // Parse file with built-in handling (ensure file data is available in the request)
       const form = new URLSearchParams(await req.text());
+      console.log("Form:", form);
       userMessage = form.get('userMessage');
+      console.log("User Message:", userMessage);
       fileBuffer = Buffer.from(form.get('file'), 'base64');
-
+      console.log("File Buffer (production):", fileBuffer);
       console.log("File Buffer (production):", fileBuffer);  // Debug log for file buffer
     }
 
@@ -57,7 +65,10 @@ export async function POST(req) {
 
     // Extract content from the uploaded PDF
     const pdfData = await pdf(fileBuffer);
+    console.log("PDF Data:", pdfData);
     const pdfText = pdfData.text;
+
+    console.log("PDF Text:", pdfText);
 
     console.log('Extracted PDF text:', pdfText);
 
@@ -76,6 +87,7 @@ export async function POST(req) {
         },
       ],
     });
+    console.log("Response:", response);
 
     return NextResponse.json({
       pdfContent: pdfText,
