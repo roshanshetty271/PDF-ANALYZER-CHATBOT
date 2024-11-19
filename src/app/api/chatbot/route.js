@@ -79,8 +79,8 @@ export async function POST(req) {
     const pdfText = pdfData.text;
     console.log('Extracted PDF Text:', pdfText);
 
-    // Send request to OpenAI API
-    console.log('Sending extracted text to OpenAI API...');
+    // Send request to OpenAI API with streaming enabled
+    console.log('Sending extracted text to OpenAI API with streaming...');
     const response = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [
@@ -94,12 +94,27 @@ export async function POST(req) {
           content: `Here is the content extracted from the uploaded PDF: ${pdfText}`,
         },
       ],
+      stream: true, // Enable streaming
     });
-    console.log('OpenAI Response:', response);
+
+    // Handle streaming response
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let result = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      result += decoder.decode(value, { stream: true });
+      // Optionally, send partial results to the client
+      console.log('Partial result:', result);
+    }
+
+    console.log('Final result:', result);
 
     return NextResponse.json({
       pdfContent: pdfText,
-      message: response.choices[0]?.message?.content || 'No response from AI.',
+      message: result || 'No response from AI.',
     });
   } catch (error) {
     console.error('Error processing the request:', error);
