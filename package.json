@@ -29,6 +29,7 @@
     "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
+    "@types/busboy": "^1.5.4",
     "@types/node": "22.9.0",
     "@types/react": "18.3.12",
     "eslint": "^8",

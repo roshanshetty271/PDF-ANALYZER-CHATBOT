@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
 import { OpenAI } from 'openai';
 import { IncomingMessage } from 'http';
 import { PassThrough } from 'stream';
+import Busboy from 'busboy';
 import dotenv from 'dotenv';
-import pdf from 'pdf-extraction';
 
 dotenv.config();
 
 const openai = new OpenAI({
-  apiKey: process.env.VITE_OPENAI_API_KEY, // Ensure this is set correctly in your environment variables
+  apiKey: process.env.VITE_OPENAI_API_KEY,
 });
 
 export const config = {
   api: {
-    bodyParser: false, // Disable Next.js body parsing to handle file uploads manually
+    bodyParser: false, // Disable Next.js body parsing to use busboy
   },
 };
 
@@ -21,10 +22,11 @@ export async function POST(req) {
   try {
     const isLocal = process.env.NODE_ENV === 'development';
 
-    let fileBuffer, userMessage;
+    let filePath = '/tmp/uploaded-file.pdf';  // Temporary file storage location
+    let userMessage;
 
     if (isLocal) {
-      // Handle FormData locally
+      // Local file handling (works without Vercel limits)
       const formData = await req.formData();
       const file = formData.get('file');
       userMessage = formData.get('userMessage');
@@ -36,44 +38,66 @@ export async function POST(req) {
         );
       }
 
-      fileBuffer = Buffer.from(await file.arrayBuffer());
+      // Save the file locally in the temporary directory for processing
+      const buffer = await file.arrayBuffer();
+      fs.writeFileSync(filePath, Buffer.from(buffer));
     } else {
-      // Parse file with built-in handling (ensure file data is available in the request)
-      const form = new URLSearchParams(await req.text());
-      userMessage = form.get('userMessage');
-      fileBuffer = Buffer.from(form.get('file'), 'base64');
+      // Vercel's serverless function file upload handling using Busboy
+      const busboy = new Busboy({ headers: req.headers });
+      const fileStream = new PassThrough();
+      const parsed = { fields: {}, files: {} };
+
+      // Pipe the incoming file to the temporary storage location
+      await new Promise((resolve, reject) => {
+        busboy.on('field', (fieldname, val) => {
+          parsed.fields[fieldname] = val;
+        });
+
+        busboy.on('file', (fieldname, file, filename) => {
+          const writeStream = fs.createWriteStream(filePath);
+          file.pipe(writeStream);
+          file.on('end', () => {
+            parsed.files[fieldname] = filePath; // Store the file path for later use
+          });
+        });
+
+        busboy.on('finish', resolve);
+        busboy.on('error', reject);
+
+        req.pipe(busboy);
+      });
+
+      userMessage = parsed.fields.userMessage;
+
+      if (!parsed.files.file || !userMessage) {
+        return NextResponse.json(
+          { error: 'Missing file or user message in the request body.' },
+          { status: 400 }
+        );
+      }
     }
 
-    // Extract content from the uploaded PDF
-    const pdfData = await pdf(fileBuffer);
-    const pdfText = pdfData.text;
+    // Process the PDF (make sure to use an efficient library like pdf-parse)
+    const { text } = await pdfParse(fs.readFileSync(filePath)); // pdfParse example, or use other extraction libs
 
-    console.log('Extracted PDF text:', pdfText);
-
-    // Send request to OpenAI API
+    // Send to OpenAI API for analysis
     const response = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [
-        {
-          role: 'system',
-          content: 'You are a helpful assistant...',
-        },
+        { role: 'system', content: 'You are a helpful assistant...' },
         { role: 'user', content: userMessage },
-        {
-          role: 'system',
-          content: `Here is the content extracted from the uploaded PDF: ${pdfText}`,
-        },
+        { role: 'system', content: `Extracted PDF: ${text}` },
       ],
     });
 
     return NextResponse.json({
-      pdfContent: pdfText,
+      pdfContent: text,
       message: response.choices[0]?.message?.content || 'No response from AI.',
     });
   } catch (error) {
     console.error('Error processing the request:', error);
     return NextResponse.json(
-      { error: 'Invalid data or error in the server processing.' },
+      { error: 'Error processing the request.' },
       { status: 500 }
     );
   }
