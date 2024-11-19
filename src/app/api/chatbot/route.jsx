@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
 import { OpenAI } from 'openai';
 import { IncomingMessage } from 'http';
 import { PassThrough } from 'stream';
-import Busboy from 'busboy';
 import dotenv from 'dotenv';
+import pdf from 'pdf-extraction';
 
 dotenv.config();
 
@@ -14,17 +13,18 @@ const openai = new OpenAI({
 
 export const config = {
   api: {
-    bodyParser: false, // Disable Next.js body parsing to use busboy
+    bodyParser: false, // Disable Next.js body parsing to handle file uploads manually
   },
 };
 
 export async function POST(req) {
   try {
     const isLocal = process.env.NODE_ENV === 'development';
+
     let fileBuffer, userMessage;
 
     if (isLocal) {
-      // Parse FormData for local environment
+      // Handle FormData locally
       const formData = await req.formData();
       const file = formData.get('file');
       userMessage = formData.get('userMessage');
@@ -38,57 +38,13 @@ export async function POST(req) {
 
       fileBuffer = Buffer.from(await file.arrayBuffer());
     } else {
-      // Use busboy for Vercel (production)
-      const busboy = new Busboy({ headers: req.headers });
-      const fileStream = new PassThrough();
-      const parsed = {
-        fields: {},
-        files: {},
-      };
-
-      // Parse the incoming request
-      await new Promise((resolve, reject) => {
-        busboy.on('field', (fieldname, val) => {
-          parsed.fields[fieldname] = val;
-        });
-
-        busboy.on('file', (fieldname, file, filename, encoding, mimeType) => {
-          const fileBufferChunks = [];
-          file.on('data', (chunk) => {
-            fileBufferChunks.push(chunk);
-          });
-
-          file.on('end', () => {
-            parsed.files[fieldname] = Buffer.concat(fileBufferChunks);
-            fileStream.end(); // End file stream
-          });
-        });
-
-        busboy.on('finish', () => {
-          resolve();
-        });
-
-        busboy.on('error', (err) => {
-          reject(err);
-        });
-
-        req.pipe(busboy);
-      });
-
-      userMessage = parsed.fields.userMessage;
-
-      if (!parsed.files.file || !userMessage) {
-        return NextResponse.json(
-          { error: 'Missing file or user message in the request body.' },
-          { status: 400 }
-        );
-      }
-
-      fileBuffer = parsed.files.file;
+      // Parse file with built-in handling (ensure file data is available in the request)
+      const form = new URLSearchParams(await req.text());
+      userMessage = form.get('userMessage');
+      fileBuffer = Buffer.from(form.get('file'), 'base64');
     }
 
     // Extract content from the uploaded PDF
-    const pdf = require('pdf-extraction');
     const pdfData = await pdf(fileBuffer);
     const pdfText = pdfData.text;
 
