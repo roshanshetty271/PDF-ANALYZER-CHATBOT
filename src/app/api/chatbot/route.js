@@ -26,7 +26,7 @@ export async function POST(req) {
 
     let fileBuffer, userMessage;
 
-    if (isLocal) {
+    // if (isLocal) {
       // Handle FormData in local environment
       console.log('Parsing FormData locally...');
       const formData = await req.formData();
@@ -43,27 +43,27 @@ export async function POST(req) {
 
       fileBuffer = Buffer.from(await file.arrayBuffer());
       console.log('File Buffer (Local):', fileBuffer);
-    } else {
-      // Production environment: handle file and userMessage from the request body
-      console.log('Parsing form data in production environment...');
-      const form = new URLSearchParams(await req.text());
-      console.log('Form Data:', form);
+    // } else {
+    //   // Production environment: handle file and userMessage from the request body
+    //   console.log('Parsing form data in production environment...');
+    //   const form = new URLSearchParams(await req.text());
+    //   console.log('Form Data:', form);
 
-      userMessage = form.get('userMessage');
-      const filePath = path.join(process.cwd(), 'uploads', 'uploadedFile.pdf');
-      console.log('File Path:', filePath);
+    //   userMessage = form.get('userMessage');
+    //   const filePath = path.join(process.cwd(), 'uploads', 'uploadedFile.pdf');
+    //   console.log('File Path:', filePath);
 
-      if (fs.existsSync(filePath)) {
-        fileBuffer = fs.readFileSync(filePath);
-        console.log('File Buffer (Production):', fileBuffer);
-      } else {
-        console.error('File not found in the uploads directory on the server.');
-        return NextResponse.json(
-          { error: 'File not found on the server.' },
-          { status: 404 }
-        );
-      }
-    }
+    //   if (fs.existsSync(filePath)) {
+    //     fileBuffer = fs.readFileSync(filePath);
+    //     console.log('File Buffer (Production):', fileBuffer);
+    //   } else {
+    //     console.error('File not found in the uploads directory on the server.');
+    //     return NextResponse.json(
+    //       { error: 'File not found on the server.' },
+    //       { status: 404 }
+    //     );
+    //   }
+    // }
 
     if (!fileBuffer) {
       console.error('File buffer is null or empty.');

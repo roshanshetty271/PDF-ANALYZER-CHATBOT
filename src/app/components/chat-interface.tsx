@@ -27,6 +27,8 @@ const ChatInterface = () => {
       return;
     }
     setLoading(true);
+    
+  
 
     // Create form data to send both file and message
     const formData = new FormData();
