@@ -7,12 +7,11 @@ dotenv.config();
 
 const openai = new OpenAI({
   apiKey: process.env.VITE_OPENAI_API_KEY,
-  timeout: 120000, // Set a higher timeout
 });
 
 export const config = {
   api: {
-    bodyParser: false, // Disable body parser for file uploads
+    bodyParser: false, // Disable Next.js body parsing to handle file uploads manually
   },
 };
 
@@ -52,9 +51,12 @@ export async function POST(req) {
     console.log('Sending extracted text to OpenAI API...');
     const responseStream = await openai.chat.completions.create({
       model: 'gpt-4',
-      stream: true, // Enable streaming
+      stream: true, // Enable streaming responses
       messages: [
-        { role: 'system', content: 'You are a helpful assistant...' },
+        {
+          role: 'system',
+          content: 'You are a helpful assistant...',
+        },
         { role: 'user', content: userMessage },
         {
           role: 'system',
@@ -63,36 +65,31 @@ export async function POST(req) {
       ],
     });
 
-    const reader = responseStream.body.getReader();
-    const decoder = new TextDecoder();
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              console.log('Stream finished.');
-              controller.close();
-              break;
+          for await (const chunk of responseStream) {
+            console.log('Chunk received:', chunk);
+
+            // Extract the text content from the chunk
+            const content = chunk.choices[0]?.delta?.content || '';
+            console.log('Extracted content:', content);
+
+            if (content) {
+              controller.enqueue(encoder.encode(content));
             }
-            const chunk = decoder.decode(value, { stream: true });
-            console.log('Chunk received:', chunk); // Debugging log
-            controller.enqueue(encoder.encode(chunk));
           }
-        } catch (err) {
-          console.error('Error in streaming response:', err);
-          controller.error(err); // Notify client of error
+          controller.close();
+        } catch (error) {
+          console.error('Error in streaming response:', error);
+          controller.error(error);
         }
       },
     });
 
     return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
+      headers: { 'Content-Type': 'text/event-stream' },
     });
   } catch (error) {
     console.error('Error processing the request:', error);
