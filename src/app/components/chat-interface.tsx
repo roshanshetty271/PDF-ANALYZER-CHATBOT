@@ -30,12 +30,13 @@ const ChatInterface = () => {
     setResponse('');
 
     try {
-      const fileBuffer = await file.arrayBuffer();
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userMessage', userMessage);
 
       const response = await fetch('/api/chatbot', {
         method: 'POST',
-        body: JSON.stringify({ userMessage, fileBuffer }),
-        headers: { 'Content-Type': 'application/json' },
+        body: formData,
       });
 
       if (!response.body) throw new Error('No response body');
