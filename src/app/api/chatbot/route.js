@@ -69,17 +69,20 @@ export async function POST(req) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          // Handle the response chunk-by-chunk
           for await (const chunk of responseStream) {
-            console.log('Chunk received:', chunk);
+            if (chunk?.choices[0]?.delta?.content) {
+              const content = chunk.choices[0].delta.content;
+              console.log('Extracted content:', content);
 
-            // Extract the text content from the chunk
-            const content = chunk.choices[0]?.delta?.content || '';
-            console.log('Extracted content:', content);
-
-            if (content) {
-              controller.enqueue(encoder.encode(content));
+              // Check if content is not empty
+              if (content) {
+                // Enqueue smaller chunks
+                controller.enqueue(encoder.encode(content));
+              }
             }
           }
+
           controller.close();
         } catch (error) {
           console.error('Error in streaming response:', error);

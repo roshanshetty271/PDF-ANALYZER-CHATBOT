@@ -1,0 +1,9 @@
+{
+    "functions": {
+      "src/app/api/chatbot/route.js": {
+        "maxDuration": 60, 
+        "memory": 1024
+      }
+    }
+  }
+  
