@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { OpenAI } from 'openai';
-import { IncomingMessage } from 'http';
-import { PassThrough } from 'stream';
+import fs from 'fs';
+import path from 'path';
 import dotenv from 'dotenv';
 import pdf from 'pdf-extraction';
 
@@ -38,14 +38,24 @@ export async function POST(req) {
 
       fileBuffer = Buffer.from(await file.arrayBuffer());
 
-      console.log("File Buffer (local):", fileBuffer);  // Debug log for file buffer
+      console.log("File Buffer (local):", fileBuffer); // Debug log for file buffer
     } else {
-      // Parse file with built-in handling (ensure file data is available in the request)
+      // Ensure files are read from the correct location
+      const filePath = path.join(process.cwd(), 'uploads', 'uploadedFile.pdf');
       const form = new URLSearchParams(await req.text());
       userMessage = form.get('userMessage');
-      fileBuffer = Buffer.from(form.get('file'), 'base64');
 
-      console.log("File Buffer (production):", fileBuffer);  // Debug log for file buffer
+      // Read the file directly from the specified location
+      if (fs.existsSync(filePath)) {
+        fileBuffer = fs.readFileSync(filePath);
+      } else {
+        return NextResponse.json(
+          { error: 'File not found on the server.' },
+          { status: 404 }
+        );
+      }
+
+      console.log("File Buffer (production):", fileBuffer); // Debug log for file buffer
     }
 
     if (!fileBuffer) {

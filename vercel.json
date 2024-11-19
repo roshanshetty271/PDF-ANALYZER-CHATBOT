@@ -1,0 +1,8 @@
+{
+    "functions": {
+      "api/your-api-route.js": {
+        "includeFiles": "uploads/**"
+      }
+    }
+  }
+  
